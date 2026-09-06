@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLUXD License Admin</title>
+<style>
+:root{--purple:#7C3AED;--purple-dark:#5B21B6;--bg:#F5F3FF;--border:#E9D5FF;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif;}
+body{background:var(--bg);min-height:100vh;}
+header{background:var(--purple);color:#fff;padding:16px 28px;display:flex;justify-content:space-between;align-items:center;}
+header h1{font-size:20px;letter-spacing:2px;}
+header button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 16px;border-radius:10px;cursor:pointer;font-weight:600;}
+.wrap{max-width:1000px;margin:28px auto;padding:0 16px;}
+.card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 8px 30px rgba(124,58,237,.10);margin-bottom:24px;}
+.card h3{font-size:16px;margin-bottom:14px;color:var(--purple-dark);}
+.row{display:flex;gap:10px;}
+input{flex:1;padding:11px 14px;border:2px solid var(--border);border-radius:10px;font-size:14px;outline:none;}
+input:focus{border-color:var(--purple);}
+.btn{border:none;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;font-size:13px;}
+.btn.p{background:var(--purple);color:#fff;} .btn.p:hover{background:var(--purple-dark);}
+.btn.g{background:#10B981;color:#fff;} .btn.r{background:#EF4444;color:#fff;} .btn.s{background:#F1F5F9;color:#334155;}
+.newkey{margin-top:12px;background:#ECFDF5;border:1px solid #A7F3D0;border-radius:10px;padding:10px 14px;font-family:Consolas,monospace;font-size:15px;display:none;}
+table{width:100%;border-collapse:collapse;font-size:13.5px;}
+th{text-align:left;color:#6B7280;font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:8px 10px;border-bottom:2px solid var(--border);}
+td{padding:10px;border-bottom:1px solid #F1F5F9;vertical-align:middle;}
+.key{font-family:Consolas,monospace;font-weight:700;color:var(--purple-dark);}
+.badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.b-ACTIVE{background:#ECFDF5;color:#059669;} .b-UNUSED{background:#F1F5F9;color:#64748B;} .b-DISABLED{background:#FEF2F2;color:#DC2626;}
+.acts{display:flex;gap:6px;flex-wrap:wrap;}
+.acts .btn{padding:6px 10px;font-size:11px;}
+.mut{color:#94A3B8;font-size:12px;}
+</style>
+</head>
+<body>
+<header><h1>CLUXD — LICENSE ADMIN</h1><button onclick="logout()">🚪 Logout</button></header>
+<div class="wrap">
+  <div class="card">
+    <h3>➕ Create New License</h3>
+    <div class="row">
+      <input id="cname" placeholder="Customer name (e.g. Fahad Medical Store)" onkeydown="if(event.key==='Enter')createLicense()">
+      <button class="btn p" onclick="createLicense()">Generate License</button>
+    </div>
+    <div class="newkey" id="newkey"></div>
+  </div>
+  <div class="card">
+    <h3>🔑 All Licenses</h3>
+    <table><thead><tr><th>Customer</th><th>License Key</th><th>Status</th><th>Machine</th><th>Activated</th><th>Actions</th></tr></thead>
+    <tbody id="tb"></tbody></table>
+  </div>
+</div>
+<script>
+const token=localStorage.getItem('admin_token');
+if(!token)location.href='/admin';
+const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+function logout(){localStorage.removeItem('admin_token');location.href='/admin';}
+async function api(path,opts={}){
+  opts.headers=Object.assign({},H,opts.headers||{});
+  const r=await fetch(path,opts);
+  if(r.status===401){logout();return null;}
+  return r.json();
+}
+async function act(action,key){           // tries REST path, falls back to body path
+  let r=await fetch('/admin/licenses/'+encodeURIComponent(key)+'/'+action,{method:'POST',headers:H});
+  if(r.status===404){r=await fetch('/admin/'+action,{method:'POST',headers:H,body:JSON.stringify({license_key:key})});}
+  load();
+}
+async function load(){
+  const d=await api('/admin/licenses'); if(!d)return;
+  const list=Array.isArray(d)?d:(d.licenses||[]);
+  const tb=document.getElementById('tb'); let h='';
+  for(const L of list){
+    h+='<tr><td><b>'+esc(L.customer_name)+'</b></td>'
+      +'<td class="key">'+esc(L.license_key)+' <button class="btn s" onclick="copyKey(\''+L.license_key+'\')">📋</button></td>'
+      +'<td><span class="badge b-'+L.status+'">'+L.status+'</span></td>'
+      +'<td class="mut">'+(L.fingerprint?esc(L.fingerprint):'—')+'</td>'
+      +'<td class="mut">'+(L.activated_at?String(L.activated_at).slice(0,10):'—')+'</td>'
+      +'<td><div class="acts">'
+      +'<button class="btn s" onclick="act(\'reset\',\''+L.license_key+'\')">🔄 Reset Device</button>'
+      +(L.status==='DISABLED'
+        ?'<button class="btn g" onclick="act(\'enable\',\''+L.license_key+'\')">✅ Enable</button>'
+        :'<button class="btn r" onclick="act(\'disable\',\''+L.license_key+'\')">⛔ Disable</button>')
+      +'</div></td></tr>';
+  }
+  tb.innerHTML=h||'<tr><td colspan="6" class="mut">No licenses yet.</td></tr>';
+}
+async function createLicense(){
+  const name=document.getElementById('cname').value.trim();
+  if(!name)return alert('Enter customer name');
+  let d=await api('/admin/licenses/create',{method:'POST',body:JSON.stringify({customer_name:name})});
+  if(!d)d=await api('/admin/create',{method:'POST',body:JSON.stringify({customer_name:name})});
+  if(d){
+    const lic=d.license?(d.license.license_key||d.license.key):(d.license_key||d.key);
+    if(lic){const nk=document.getElementById('newkey');nk.style.display='block';nk.innerHTML='✅ Created: <b>'+esc(lic)+'</b> <button class="btn s" onclick="copyKey(\''+lic+'\')">📋 Copy</button>';}
+    document.getElementById('cname').value='';
+    load();
+  }
+}
+function copyKey(k){navigator.clipboard.writeText(k);alert('Copied: '+k);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+load();
+</script>
+</body>
+</html>

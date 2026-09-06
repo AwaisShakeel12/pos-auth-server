@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLUXD License Admin — Login</title>
+<style>
+:root{--purple:#7C3AED;--purple-dark:#5B21B6;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif;}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#F5F3FF,#EDE9FE);}
+.card{background:#fff;border-radius:20px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(124,58,237,.18);}
+.logo{text-align:center;font-size:30px;font-weight:800;color:var(--purple);letter-spacing:3px;}
+.sub{text-align:center;color:#6B7280;font-size:13px;margin:6px 0 28px;}
+label{font-size:13px;font-weight:600;color:#6B7280;display:block;margin-bottom:6px;}
+input{width:100%;padding:12px 14px;border:2px solid #E9D5FF;border-radius:12px;font-size:15px;outline:none;}
+input:focus{border-color:var(--purple);}
+button{width:100%;margin-top:16px;padding:13px;border:none;border-radius:12px;background:var(--purple);color:#fff;font-size:15px;font-weight:700;cursor:pointer;}
+button:hover{background:var(--purple-dark);}
+.err{color:#EF4444;font-size:13px;margin-top:10px;text-align:center;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">CLUXD</div>
+  <div class="sub">License Management — Admin Login</div>
+  <label>Admin Password</label>
+  <input type="password" id="pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()">
+  <button onclick="login()">🔓 Login</button>
+  <div class="err" id="err"></div>
+</div>
+<script>
+async function login(){
+  const err=document.getElementById('err'); err.style.display='none';
+  try{
+    const r=await fetch('/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:document.getElementById('pwd').value})});
+    const d=await r.json();
+    if(d.ok&&d.token){localStorage.setItem('admin_token',d.token);location.href='/admin/dashboard';}
+    else{err.textContent=d.detail||'Wrong password.';err.style.display='block';}
+  }catch(e){err.textContent='Cannot reach server.';err.style.display='block';}
+}
+</script>
+</body>
+</html>
