@@ -1,7 +1,7 @@
 import os, secrets, string, datetime
 from dotenv import load_dotenv
 
-from .server import crypto
+
 load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Depends, Header
